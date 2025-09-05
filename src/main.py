@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from api import router
 from config import settings
 from core.exception import AppException
 from infrastructure.database.postgres import PostgresDatabase
@@ -23,6 +24,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
 configure_root_logging()
 fastapi_app = FastAPI(lifespan=lifespan)
+fastapi_app.include_router(router)
 
 
 @fastapi_app.exception_handler(AppException)
