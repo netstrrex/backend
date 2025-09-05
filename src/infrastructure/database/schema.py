@@ -1,6 +1,65 @@
 SCHEMA = """
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+DROP FUNCTION IF EXISTS add_product_to_order(uuid, uuid, integer);
+
+CREATE OR REPLACE FUNCTION add_product_to_order(
+    p_order_id   UUID,
+    p_product_id UUID,
+    p_quantity   INTEGER
+) RETURNS INTEGER AS $$
+DECLARE
+    v_stock      INTEGER;
+    v_order_item UUID;
+BEGIN
+    PERFORM 1 FROM orders WHERE id = p_order_id;
+    IF NOT FOUND THEN
+        RETURN 3;
+    END IF;
+
+    SELECT quantity INTO v_stock
+    FROM products
+    WHERE id = p_product_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN 4;
+    END IF;
+
+    IF v_stock < p_quantity THEN
+        RETURN 0;
+    END IF;
+
+    SELECT id INTO v_order_item
+    FROM order_items
+    WHERE order_id = p_order_id
+      AND product_id = p_product_id
+    FOR UPDATE;
+
+    IF FOUND THEN
+        UPDATE order_items
+        SET quantity = quantity + p_quantity
+        WHERE id = v_order_item;
+
+        UPDATE products
+        SET quantity = quantity - p_quantity
+        WHERE id = p_product_id;
+
+        RETURN 1;
+    ELSE
+        INSERT INTO order_items (id, order_id, product_id, quantity)
+        VALUES (uuid_generate_v4(), p_order_id, p_product_id, p_quantity);
+
+        UPDATE products
+        SET quantity = quantity - p_quantity
+        WHERE id = p_product_id;
+
+        RETURN 2;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+
 CREATE TABLE IF NOT EXISTS categories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
