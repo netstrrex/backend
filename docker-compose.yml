@@ -9,6 +9,8 @@ services:
       - postgresql
     networks:
       - db_network
+    ports:
+      - "8000:8000"
     env_file:
       - .env
     restart: unless-stopped
